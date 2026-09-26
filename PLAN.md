@@ -113,7 +113,7 @@ Each has a working assumption; none blocks implementation.
 
 ## 4. Architecture and stack
 
-**SQL Server** (chosen) · .NET 8 Web API · EF Core 8 · Angular 17 standalone + signals.
+**SQL Server** (chosen) · .NET 10 Web API · EF Core 10 · Angular 21 standalone + signals.
 
 ### Timezone strategy — a `week_buckets` dimension, not `AT TIME ZONE`
 

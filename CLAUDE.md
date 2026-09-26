@@ -13,10 +13,10 @@ Planning done, **nothing implemented yet**. Repo currently holds `db/`, `docs/`,
 
 | Layer | Choice |
 |---|---|
-| Backend | .NET 8 Web API, EF Core 8 (migrations — never `EnsureCreated`) |
+| Backend | .NET 10 Web API, EF Core 10 (migrations — never `EnsureCreated`) |
 | DB | SQL Server in Docker |
 | Reads | Raw parameterised SQL via `Database.SqlQueryRaw<T>` for the aggregation; EF for writes |
-| Frontend | Angular 17 standalone components + signals. **No NgRx** |
+| Frontend | Angular 21 standalone components + signals. **No NgRx** |
 | Tests | xUnit; Testcontainers for integration only |
 | Tooling | Python 3.10 — `tools/profile_seed.py` (the data oracle) |
 
