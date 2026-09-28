@@ -138,6 +138,11 @@ def run(api: Api, seed: op.Seed) -> Checker:
     c.row(f"ZeroFill acct 6 Site G {w}", seed.pulse(6, D(w))["locations"]["Site G"],
           location(api.pulse(6, w), "Site G"))
 
+    # ZeroFill_EmptyWeekCountsAsZeroInBaseline (window includes Site G's empty 2026-04-13)
+    w = "2026-06-29"
+    c.row(f"ZeroFill baseline acct 6 Site G {w}", seed.pulse(6, D(w))["locations"]["Site G"],
+          location(api.pulse(6, w), "Site G"))
+
     # Baseline_InsufficientHistory
     w = "2026-03-23"
     o, b = seed.pulse(18, D(w)), api.pulse(18, w)

@@ -24,7 +24,7 @@ public sealed class PulseQuery(RelayDbContext db)
         FROM accounts a
         JOIN week_buckets b
           ON b.timezone = a.timezone
-         AND b.is_complete = 1
+         AND b.is_complete = 1 -- backstop only: PulseEndpoints' complete-week list owns the rule (T3 mutation b′)
          AND b.week_start_local >= @from
          AND b.week_start_local <= @to
         JOIN {RelayDbContext.DedupView} e

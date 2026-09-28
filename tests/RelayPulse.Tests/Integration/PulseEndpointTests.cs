@@ -109,6 +109,22 @@ public class PulseEndpointTests(PulseApiFixture api)
         Assert.Equal("below", Verdict(g));
     }
 
+    // Rule: a complete week with no events counts as 0 in the baseline, not as missing.
+    // Site G's window 2026-04-06 … 2026-06-22 is [2,0,2,6,4,3,7,5,57,4,5,3]; the trim drops 0 and 57 → 41/10.
+    // Skipping the empty week would give 4.33 (fixed window) or 4.7 (window slides back to 2026-03-30).
+    // [OPw] --account 6 --week 2026-06-29: "Site G n=0 λ=4.1 band=[1,10] below"
+    [Fact]
+    public async Task ZeroFill_EmptyWeekCountsAsZeroInBaseline()
+    {
+        var pulse = await api.GetOkPulseAsync(6, "2026-06-29", Ct);
+
+        var g = Location(pulse, "Site G");
+        Assert.Equal(0, Count(g));
+        Assert.Equal(4.1, Lambda(g), 10);
+        Assert.Equal(12, g.GetProperty("baselineWeeks").GetInt32());
+        Assert.Equal("below", Verdict(g));
+    }
+
     // Rule: baseline needs at least 8 prior complete weeks; 2026-03-23 has 7 (2026-02-02 … 2026-03-16).
     // [OPw] --account 18 --week 2026-03-23: "λ=- band=- insufficient_history"
     [Fact]
