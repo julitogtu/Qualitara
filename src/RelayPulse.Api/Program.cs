@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using RelayPulse.Api.Accounts;
 using RelayPulse.Api.Data;
 using RelayPulse.Api.Data.Seeding;
 using RelayPulse.Api.Pulse;
@@ -37,6 +38,7 @@ if (args is ["seed", .. var rest])
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
+app.MapAccounts();
 app.MapPulse();
 
 app.Run();

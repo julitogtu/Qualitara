@@ -291,4 +291,34 @@ public class PulseEndpointTests(PulseApiFixture api)
             Assert.True(band.GetProperty("lo").GetInt32() <= band.GetProperty("hi").GetInt32());
         });
     }
+
+    // Rule: week navigation is driven by the server; the SPA never hardcodes dates. Prev/next are the
+    // neighbouring COMPLETE weeks and null at the edges of the window.
+    // [PS] §6 "27 buckets, 25 complete": first complete 2026-02-02, last complete 2026-07-20.
+    [Theory]
+    [InlineData("2026-02-02", null, "2026-02-09")]
+    [InlineData("2026-06-01", "2026-05-25", "2026-06-08")]
+    [InlineData(LastCompleteWeek, "2026-07-13", null)]
+    public async Task Contract_Period_ExposesWindowEdgesAndNeighbours(string week, string? previous, string? next)
+    {
+        var period = (await api.GetOkPulseAsync(1, week, Ct)).GetProperty("period");
+
+        Assert.Equal("2026-02-02", period.GetProperty("firstCompleteWeek").GetString());
+        Assert.Equal(LastCompleteWeek, period.GetProperty("lastCompleteWeek").GetString());
+        Assert.Equal(previous, period.GetProperty("previousWeek").GetString());
+        Assert.Equal(next, period.GetProperty("nextWeek").GetString());
+    }
+
+    // Rule: the account picker lists every account, including the empty one, with its timezone.
+    // [PS] §2: 20 accounts; 1 = Summit Auto Group / America/Chicago; 20 = Quiet Harbor Spa, 0 events.
+    [Fact]
+    public async Task Accounts_ListsAllAccountsOrderedById()
+    {
+        var accounts = (await api.GetOkJsonAsync("/api/accounts", Ct)).EnumerateArray().ToList();
+
+        Assert.Equal(Enumerable.Range(1, 20), accounts.Select(a => a.GetProperty("id").GetInt32()));
+        Assert.Equal("Summit Auto Group", accounts[0].GetProperty("name").GetString());
+        Assert.Equal("America/Chicago", accounts[0].GetProperty("timezone").GetString());
+        Assert.Equal("Quiet Harbor Spa", accounts[19].GetProperty("name").GetString());
+    }
 }

@@ -100,6 +100,17 @@ public sealed class PulseApiFixture : IAsyncLifetime
         return (response.StatusCode, document.RootElement.Clone());
     }
 
+    /// <summary>GET any API path, asserting HTTP 200; skips the calling test when Docker is absent.</summary>
+    public async Task<JsonElement> GetOkJsonAsync(string path, CancellationToken cancellationToken)
+    {
+        Assert.SkipWhen(SkipReason is not null, SkipReason ?? string.Empty);
+
+        using var response = await _client!.GetAsync(path, cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        return document.RootElement.Clone();
+    }
+
     /// <summary>As <see cref="GetPulseAsync"/>, asserting HTTP 200.</summary>
     public async Task<JsonElement> GetOkPulseAsync(int accountId, string? week, CancellationToken cancellationToken)
     {

@@ -1,0 +1,122 @@
+<nav>
+  <label>
+    Account
+    <select data-testid="account-picker" (change)="selectAccount($any($event.target).value)">
+      @if (accounts.hasValue()) {
+        @for (a of accounts.value(); track a.id) {
+          <option [value]="'' + a.id" [selected]="'' + a.id === id()">{{ a.id }} · {{ a.name }}</option>
+        }
+      }
+    </select>
+  </label>
+
+  @if (pulse.hasValue() && pulse.value().period; as period) {
+    <button
+      type="button"
+      data-testid="prev-week"
+      [disabled]="!period.previousWeek"
+      (click)="goToWeek(period.previousWeek)"
+    >
+      ← Previous week
+    </button>
+    <button
+      type="button"
+      data-testid="next-week"
+      [disabled]="!period.nextWeek"
+      (click)="goToWeek(period.nextWeek)"
+    >
+      Next week →
+    </button>
+  }
+</nav>
+
+@if (pulse.isLoading()) {
+  <p role="status">Loading…</p>
+} @else if (errorStatus() === 404) {
+  <h1 data-testid="state-not-found">Account not found</h1>
+  <p>There is no account with id {{ id() }}. Pick one from the list above.</p>
+} @else if (errorStatus() === 400) {
+  <h1>Week not available</h1>
+  <p>
+    {{ week() }} is not a complete week for this account.
+    <button type="button" (click)="selectAccount(id())">Go to the latest complete week</button>
+  </p>
+} @else if (errorStatus() !== null) {
+  <h1>Something went wrong</h1>
+  <p>The dashboard could not be loaded. Is the API running?</p>
+} @else if (pulse.hasValue()) {
+  @let p = pulse.value();
+  <header>
+    <h1 data-testid="account-name">{{ p.accountName }}</h1>
+    @if (periodLabel(); as label) {
+      <p data-testid="period">{{ label }}</p>
+    }
+    <p data-testid="account-verdict" [hidden]="p.state === 'empty'">
+      <strong>This week: {{ p.account.count }} events — {{ verdictLabel(p.account) }}</strong>
+      @if (p.account.band) {
+        (typical range {{ bandLabel(p.account) }})
+      }
+      @if (verdictExplanation(p.account); as why) {
+        <br />{{ why }}
+      }
+    </p>
+  </header>
+
+  <p>
+    <small>
+      “Normal” means within this location's typical range, based on its last 12 complete weeks. Most
+      weeks being normal is expected — flags are meant to be rare.
+    </small>
+  </p>
+
+  @if (p.state === 'empty') {
+    <p data-testid="state-empty">
+      This account has no recorded activity yet, so there is nothing to compare.
+    </p>
+  } @else {
+    @if (p.account.verdict === 'insufficient_history') {
+      <p data-testid="state-insufficient">
+        Not enough history to judge this week: a verdict needs at least 8 complete weeks before it
+        (this week has {{ p.account.baselineWeeks }}). Counts are shown without a verdict.
+      </p>
+    } @else if (p.account.verdict === 'not_enough_volume') {
+      <p data-testid="state-low-volume">
+        This account usually has too few events per week for a change to stand out from chance.
+        Counts are shown without a verdict.
+      </p>
+    }
+
+    <!-- Rows in the server's (ranked) order; never re-sorted here. -->
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Location</th>
+          <th scope="col">Events</th>
+          <th scope="col">Typical range</th>
+          <th scope="col">Verdict</th>
+          <th scope="col">By type</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of p.locations; track row.location) {
+          <tr>
+            <th scope="row">{{ row.location }}</th>
+            <td>{{ row.count }}</td>
+            <td>{{ bandLabel(row) }}</td>
+            <td>
+              {{ verdictLabel(row) }}
+              @if (verdictExplanation(row); as why) {
+                <br /><small>{{ why }}</small>
+              }
+            </td>
+            <td>
+              @for (s of splitLabels(row.byType); track s) {
+                <div>{{ s }}</div>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+}
