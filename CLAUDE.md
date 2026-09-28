@@ -6,8 +6,9 @@ short version: the rules that must hold in code.
 
 ## Status
 
-T0 done: solution skeleton, SQL Server compose, timezone gate green (all 6 seed zones resolve by
-IANA id on Windows — no fallback map). **No feature code yet**; next is T1 (migrations, seed import).
+T0–T1 done: skeleton, SQL Server compose, timezone gate green; EF migrations (accounts,
+activity_events, `activity_events_dedup` view, week_buckets), seed import, Core bucket generator.
+DB counts match the goldens. Review-state table deferred to T5. Next is T2 (aggregation + `/pulse`).
 
 ## Stack
 
@@ -100,6 +101,9 @@ These come from profiling the seed. Violating one produces plausible, wrong numb
 - One timezone per account; the schema cannot express per-location zones (known limitation).
 
 **Reads**
+- Raw-SQL result rows must not carry `DateTime` unless mapped: the UTC converter reaches
+  `SqlQueryRaw<DateTime>` scalars (via `DefaultTypeMapping`) but **not** `DateTime` members of an
+  unmapped record — those come back `Unspecified`. Use `DateOnly`/scalars, or map the row type keyless.
 - All reporting reads go through the **dedupe view**, never the raw table. 12 exact duplicate rows
   (7 accounts, 11 location-weeks) swing an affected location-week by 1–50%, median 12%.
 
@@ -149,5 +153,7 @@ python tools/profile_seed.py              # full profile, raw
 python tools/profile_seed.py --dedupe     # what the API should serve
 python tools/profile_seed.py --markdown   # markdown tables
 docker compose up -d                      # SQL Server 2022 on localhost:1433 (see .env.example)
+dotnet run --project src/RelayPulse.Api -- seed   # migrate + load db/seed.sql + build week_buckets (idempotent)
+dotnet tool restore && dotnet ef migrations add <Name> --project src/RelayPulse.Api --output-dir Data/Migrations
 dotnet build && dotnet test               # unit tests need no Docker
 ```
