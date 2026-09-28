@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk"><!-- Pure domain: no EF Core, no ASP.NET Core. Only Microsoft.Extensions.*.Abstractions allowed. -->
+
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+</Project>

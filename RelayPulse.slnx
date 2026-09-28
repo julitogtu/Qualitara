@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RelayPulse.Api/RelayPulse.Api.csproj" />
+    <Project Path="src/RelayPulse.Core/RelayPulse.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RelayPulse.Tests/RelayPulse.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -6,8 +6,8 @@ short version: the rules that must hold in code.
 
 ## Status
 
-Planning done, **nothing implemented yet**. Repo currently holds `db/`, `docs/`,
-`tools/profile_seed.py`, `ai-log/`, `PLAN.md`. Treat the stack below as the target.
+T0 done: solution skeleton, SQL Server compose, timezone gate green (all 6 seed zones resolve by
+IANA id on Windows — no fallback map). **No feature code yet**; next is T1 (migrations, seed import).
 
 ## Stack
 
@@ -148,4 +148,6 @@ From `python tools/profile_seed.py --dedupe`.
 python tools/profile_seed.py              # full profile, raw
 python tools/profile_seed.py --dedupe     # what the API should serve
 python tools/profile_seed.py --markdown   # markdown tables
+docker compose up -d                      # SQL Server 2022 on localhost:1433 (see .env.example)
+dotnet build && dotnet test               # unit tests need no Docker
 ```

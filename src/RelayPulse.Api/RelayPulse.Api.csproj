@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\RelayPulse.Core\RelayPulse.Core.csproj" />
+  </ItemGroup>
+
+</Project>
