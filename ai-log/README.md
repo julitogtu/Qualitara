@@ -12,6 +12,7 @@ Times are America/Bogota (UTC-5).
 | 02 | `937226c2-ee17-4588-90c2-7ff1390d7af5` | 2026-09-28 | T0–T1: conventions extracted from my VerusLLC repo into `CLAUDE.md`, scaffold, migrations, dedupe view, week_buckets, seed loader | `48b55d0`, `7d0016d`, `90f63c2` |
 | 03 | `42552680-bb73-4784-8d48-2c36a24a92e5` | 2026-09-28 | T2: Poisson tails, trimmed-mean baseline, bands and verdicts in Core (tests first); /pulse aggregation query + endpoint; aggregation-reviewer subagent pass (goldens moved to the checked-in oracle, location-list and empty-state fixes, null band); integration tests deferred to T3 | `<hash>` |
 | 04 | `8a026810-cf9a-49e9-aa45-a2c9fdbb4eac` | 2026-09-28 | T3: Testcontainers integration tests for /pulse (one shared SQL Server, real seed loader), `tools/verify_aggregates.py` live cross-check, oracle extended (rank key, raw-vs-deduped, `--series`); mutation check (dedupe view, is_complete, zero-fill) closed a zero-fill gap; stash draft salvaged and dropped | `71db85c`, `7cfc03f`, `c218fc4`, `5624246`, `15c6697` |
+| 05 | `3f42f924-5440-41c2-b2b7-8a67f9dfccbe` | 2026-09-28 | T4: Angular SPA in web/ (standalone, signals); URL as the single source of state (/accounts/:id/week/:week, canonical redirect, back button); plain-language verdicts ("1 in N", no p-values); states for empty, not found, insufficient history, week not available; GET /api/accounts + window-edge contract tests; F5 reload and new-window checks verified manually | `<hash>` |
 
 Agent context authored for this task: `CLAUDE.md`.
 
