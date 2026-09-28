@@ -109,11 +109,16 @@ class Seed:
         tzs = {a: ZoneInfo(r["timezone"]) for a, r in self.accounts.items()}
         for a, tz in tzs.items():
             self.complete[a] = ps.Window(lo.astimezone(tz).date(), hi.astimezone(tz).date()).complete
+        self.utc_total: dict[int, Counter] = {a: Counter() for a in self.accounts}
+        self.null_outcome: dict[int, Counter] = {a: Counter() for a in self.accounts}
         for e, t in zip(events, utc):
             a = e["account_id"]
             w = ps.week_start(t.astimezone(tzs[a]).date())
             self.total[a][w] += 1
             self.by_loc[a].setdefault(e["location"], Counter())[w] += 1
+            self.utc_total[a][ps.week_start(t.date())] += 1  # the wrong bucketing, for contrast only
+            if e["outcome"] is None:
+                self.null_outcome[a][w] += 1
         # The raw table, same bucketing: only to show what reading past the dedupe view would serve.
         self.raw_by_loc: Counter = Counter()
         for e in conn.execute("SELECT account_id, location, occurred_at FROM activity_events"):
@@ -158,6 +163,19 @@ def print_pulse(p: dict) -> None:
         print(f"  #{rank:<2} {loc:<8} {fmt(row)}  rank_key={row['rank_key']:.4g}")
 
 
+def print_series(seed: Seed, account: int) -> None:
+    """Weekly totals over every complete week: account-local (served) vs UTC (wrong), NULL outcomes."""
+    weeks = seed.complete[account]
+    local = [seed.total[account].get(w, 0) for w in weeks]
+    print(f"account {account} ({seed.accounts[account]['timezone']}), {len(weeks)} complete weeks:")
+    for w, n in zip(weeks, local):
+        u = seed.utc_total[account].get(w, 0)
+        flag = "  <- differs under UTC" if u != n else ""
+        print(f"  {w}  local={n:<4} utc={u:<4} null_outcome={seed.null_outcome[account].get(w, 0)}{flag}")
+    print(f"  series: {local}")
+    print(f"  min={min(local)} max={max(local)} median={sorted(local)[len(local) // 2]}")
+
+
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -165,9 +183,13 @@ def main() -> int:
     ap.add_argument("--db-dir", default="db", type=Path)
     ap.add_argument("--account", type=int)
     ap.add_argument("--week", type=date.fromisoformat)
+    ap.add_argument("--series", action="store_true", help="with --account: weekly totals, local vs UTC")
     args = ap.parse_args()
 
     seed = Seed(args.db_dir)
+    if args.account is not None and args.series:
+        print_series(seed, args.account)
+        return 0
     if args.account is not None:
         print_pulse(seed.pulse(args.account, args.week))
         return 0

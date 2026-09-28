@@ -7,6 +7,7 @@ namespace RelayPulse.Tests.Integration;
 //   [PS]  python tools/profile_seed.py --dedupe          (counts, window, dedupe)
 //   [OP]  python tools/oracle_poisson.py                 (λ, bands, verdicts, raw vs deduped)
 //   [OPw] python tools/oracle_poisson.py --account A --week W   (one account-week, ranked)
+//   [OPs] python tools/oracle_poisson.py --account A --series   (weekly totals local vs UTC, NULL outcomes)
 // tools/verify_aggregates.py runs the same cases against a live API with the oracle in-process.
 [Collection(SqlServerCollection.Name)]
 public class PulseEndpointTests(PulseApiFixture api)
@@ -51,6 +52,59 @@ public class PulseEndpointTests(PulseApiFixture api)
         Assert.Equal(LastCompleteWeek, pulse.GetProperty("period").GetProperty("weekStart").GetString());
         Assert.True(pulse.GetProperty("period").GetProperty("isDefault").GetBoolean());
         Assert.Equal(expected, Count(pulse.GetProperty("account")));
+    }
+
+    // Rule: bucket in the account's own IANA timezone, never UTC. Weekly totals over all 25 complete
+    // weeks; UTC bucketing moves 2 events each for these accounts (acct 1: 02-23/03-02, 06-29/07-06;
+    // acct 9: 06-29 … 07-20), so this fails if bucketing regresses to UTC.
+    // [OPs] python tools/oracle_poisson.py --account N --series; cross-checked against [PS] §6 min/max/median.
+    [Theory]
+    [InlineData(1, new[] { 43, 51, 40, 50, 51, 52, 36, 45, 61, 60, 37, 53, 56, 44, 58, 51, 46, 36, 47, 47, 39, 62, 42, 50, 53 })]
+    [InlineData(9, new[] { 25, 21, 22, 23, 19, 20, 18, 21, 26, 24, 25, 31, 23, 12, 29, 26, 17, 18, 27, 20, 22, 16, 15, 17, 24 })]
+    public async Task Bucketing_AccountLocalWeeks_MatchOracleSeries(int accountId, int[] series)
+    {
+        var actual = new List<int>();
+        for (var week = new DateOnly(2026, 2, 2); actual.Count < series.Length; week = week.AddDays(7))
+        {
+            var pulse = await api.GetOkPulseAsync(accountId, week.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), Ct);
+            actual.Add(Count(pulse.GetProperty("account")));
+        }
+
+        Assert.Equal(series, actual);
+    }
+
+    // Rule: a NULL outcome is counted and served as "unspecified", never dropped; splits add up at both grains.
+    // [OPs] --account 1 --series: "2026-07-20 local=53 … null_outcome=2"
+    [Fact]
+    public async Task Splits_NullOutcomeCountedAsUnspecified()
+    {
+        var pulse = await api.GetOkPulseAsync(1, null, Ct);
+
+        foreach (var row in pulse.GetProperty("locations").EnumerateArray().Append(pulse.GetProperty("account")))
+        {
+            var types = row.GetProperty("byType").EnumerateArray().ToList();
+            Assert.Equal(Count(row), types.Sum(Count));
+            Assert.All(types, t => Assert.Equal(Count(t), t.GetProperty("outcomes").EnumerateObject().Sum(o => o.Value.GetInt32())));
+        }
+
+        var unspecified = pulse.GetProperty("account").GetProperty("byType").EnumerateArray()
+            .Sum(t => t.GetProperty("outcomes").TryGetProperty("unspecified", out var n) ? n.GetInt32() : 0);
+        Assert.Equal(2, unspecified);
+    }
+
+    // Rule: verdicts are Poisson tail tests, never a percentage threshold. 7 vs λ 10.8 is −35%, yet inside [5,20].
+    // [OP] "8: n=7 λ=10.8 band=[5,20] normal"
+    [Fact]
+    public async Task Verdict_DropWithinPoissonNoise_IsNormalNotPercentageAlarm()
+    {
+        var pulse = await api.GetOkPulseAsync(8, null, Ct);
+
+        var account = pulse.GetProperty("account");
+        Assert.Equal(7, Count(account));
+        Assert.Equal(10.8, Lambda(account), 10);
+        Assert.Equal(5, account.GetProperty("band").GetProperty("lo").GetInt32());
+        Assert.Equal(20, account.GetProperty("band").GetProperty("hi").GetInt32());
+        Assert.Equal("normal", Verdict(account));
     }
 
     // Rule: location key is (account_id, location); per-location counts sum the same deduped events.
@@ -199,9 +253,12 @@ public class PulseEndpointTests(PulseApiFixture api)
 
     // Rule: partial weeks are never served ([PS] 2026-07-27 covers 1/7 days); only complete-week Mondays are.
     [Theory]
-    [InlineData("2026-07-27")] // partial week
+    [InlineData("2026-07-27")] // trailing partial week
+    [InlineData("2026-01-26")] // leading partial week ([PS] §6 partial buckets)
+    [InlineData("2026-08-03")] // after the data
     [InlineData("2026-07-22")] // Wednesday inside a complete week
     [InlineData("2026-7-20")]  // not YYYY-MM-DD
+    [InlineData("junk")]
     public async Task Contract_WeekNotACompleteMonday_Returns400(string week)
     {
         var (status, problem) = await api.GetPulseAsync(1, week, Ct);
