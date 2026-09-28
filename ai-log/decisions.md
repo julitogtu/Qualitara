@@ -79,3 +79,6 @@ Times: America/Bogota (UTC-5). Format: time · ACCEPTED|REJECTED|REDIRECTED · w
 2026-09-28 09:38 · [me] ACCEPTED · navigation edges = complete weeks, so the first 8 weeks show "insufficient history" instead of being blocked · makes that state reachable, not just for account 20 · session 05
 2026-09-28 09:38 · [me] NOTED · GET /api/accounts was in PLAN.md §4 but missing from T2; added in T4 with an integration test · session 05
 2026-09-28 09:38 · [me] DECIDED · removed CLI-generated web/README.md and web/.vscode · one root README; no editor config in repo · session 05
+
+2026-09-28 10:05 · [agent] CAUGHT · PLAN.md numbering: README is T6, review state was T5 · commit messages aligned to the committed PLAN.md · session 06
+2026-09-28 10:05 · [me] REJECTED · agent's claim that the model (trimmed mean, asymmetric α, λ ≥ 3.7 gate) was introduced in T2 · rev 2 was agreed in planning (transcript 01, 2026-09-26 11:08–11:15) before any code; the PLAN.md file was just never updated · session 06
