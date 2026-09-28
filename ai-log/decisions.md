@@ -66,3 +66,8 @@ Times: America/Bogota (UTC-5). Format: time · ACCEPTED|REJECTED|REDIRECTED · w
 2026-09-28 07:36 · [me] REDIRECTED · agent wanted to write integration tests before committing T2 → moved to T3 · keep phase boundaries clean; T3 owns integration tests per PLAN.md · session 03
 2026-09-28 07:36 · [me] DEFERRED · log-p tie-breaking for extreme flags · p≈0 ties barely occur with the seed; noted for README · session 03
 2026-09-28 07:36 · [me] DECIDED · decisions.md timestamps are America/Bogota (UTC-5); UTC lines converted and checked against git log --date=local · consistent timeline for reviewers · session 03
+
+2026-09-28 08:46 · [me] DECIDED · salvaged from stash: account-local series (accts 1, 9), NULL→unspecified splits, acct 8 calibration, extra 400 cases; stash dropped · they cover timezone and messy-data criteria the suite missed · 5624246
+2026-09-28 08:58 · [me] REJECTED · agent claim "UTC changes 2 weeks for account 1" · 2 moved events change 4 weekly totals · 15c6697
+2026-09-28 09:00 · [me] VERIFIED · acct 1 and 9 weekly series cross-checked with a separate independent script, all 25 weeks; acct 1's two deviations from raw counts (04-27: 57→56, 07-06: 43→42) are exactly its two duplicate rows · agent's own cross-check (min/max/median) was too weak to rely on · session 04
+2026-09-28 09:00 · [me] DEFERRED · adding new cases to verify_aggregates.py · covered by integration tests; time goes to T4 · session 04
