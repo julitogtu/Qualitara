@@ -20,6 +20,31 @@ Planning done, **nothing implemented yet**. Repo currently holds `db/`, `docs/`,
 | Tests | xUnit; Testcontainers for integration only |
 | Tooling | Python 3.10 — `tools/profile_seed.py` (the data oracle) |
 
+## Structure conventions
+
+- **Solution**: `RelayPulse.slnx` with `src/` (Api, Core) and `tests/` (Tests) solution folders. Three
+  projects only.
+- **Build**: `Directory.Build.props` sets `net10.0`, `Nullable`, `ImplicitUsings`,
+  `TreatWarningsAsErrors` once. No per-csproj duplicates, no `LangVersion` pin.
+- **Packages**: central management in `Directory.Packages.props`; EF Core / AspNetCore on 10.0.x,
+  `Testcontainers.MsSql` for integration. No `Version=` on a `PackageReference`.
+- **DI**: each project exposes one `IServiceCollection` extension (`AddCore()`, …) and `Program.cs`
+  composes them. `IClock`'s real implementation is registered there and nowhere else.
+- **Async**: every async method takes and passes a `CancellationToken`, down to `SqlQueryRaw`.
+- **Errors**: 4xx responses are ProblemDetails with a machine-readable code as `title`
+  (e.g. `pulse.invalid_week`). 400 for bad parameters only; an empty account is 200, never 404.
+- **Logging**: structured message templates with a `Pulse:` prefix
+  (`"Pulse: served {AccountId} week {Week}"`) — never string interpolation.
+- **Tests**: xUnit v3, plain `Assert` (no FluentAssertions). API tests go through
+  `WebApplicationFactory` and assert on the wire JSON via `JsonElement`. Names are
+  `Method_Condition_Outcome`. `Program.cs` ends with `public partial class Program;`.
+- **Compose**: SQL Server service has a healthcheck; the API `depends_on` it with
+  `condition: service_healthy`.
+
+Rejected alternatives (MediatR, extra layers, versioning, Serilog, …) and their reasons are in
+`ai-log/decisions.md`. `C:\src\demos\VerusLLC` was a one-time reference for T0 — do not consult it
+again; this file is the source of truth.
+
 ## Working rules
 
 **Never read `db/seed.sql` in full.** 2.4MB, ~12,600 INSERTs. It will blow out context and tell
