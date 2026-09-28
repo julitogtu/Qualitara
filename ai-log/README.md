@@ -10,6 +10,7 @@ Times are America/Bogota (UTC-5).
 |---|---|---|---|---|
 | 01 | `d7486560-6acc-4665-90c6-35b26df35cff` | 2026-09-26 | Data profiling (`tools/profile_seed.py`) + planning → `PLAN.md` rev 1 and rev 2, `CLAUDE.md` | `e61943a`, `94bf413`, `80dd278`, `c93e15c` |
 | 02 | `937226c2-ee17-4588-90c2-7ff1390d7af5` | 2026-09-28 | T0–T1: conventions extracted from my VerusLLC repo into `CLAUDE.md`, scaffold, migrations, dedupe view, week_buckets, seed loader | `48b55d0`, `7d0016d`, `90f63c2` |
+| 03 | `42552680-bb73-4784-8d48-2c36a24a92e5` | 2026-09-28 | T2: Poisson tails, trimmed-mean baseline, bands and verdicts in Core (tests first); /pulse aggregation query + endpoint; aggregation-reviewer subagent pass (goldens moved to the checked-in oracle, location-list and empty-state fixes, null band); integration tests deferred to T3 | `<hash>` |
 
 Agent context authored for this task: `CLAUDE.md`.
 
