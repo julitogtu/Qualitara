@@ -15,10 +15,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\RelayPulse.Api\RelayPulse.Api.csproj" />
     <ProjectReference Include="..\..\src\RelayPulse.Core\RelayPulse.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers.MsSql" />
     <PackageReference Include="xunit.v3.mtp-v2" />
   </ItemGroup>
 
