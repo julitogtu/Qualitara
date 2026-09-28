@@ -77,6 +77,13 @@ def baseline(prior: list[int]) -> float | None:
     return sum(trimmed) / len(trimmed)
 
 
+def rank_key(n: int, lam: float | None, v: str) -> float:
+    """min(p_low/α_low, p_high/α_high) for judged rows; +∞ for insufficient history or low volume."""
+    if v in ("insufficient_history", "not_enough_volume"):
+        return math.inf
+    return min(p_low(n, lam) / ALPHA_LOW, p_high(n, lam) / ALPHA_HIGH)
+
+
 def verdict(n: int, lam: float | None) -> str:
     if lam is None:
         return "insufficient_history"
@@ -107,13 +114,20 @@ class Seed:
             w = ps.week_start(t.astimezone(tzs[a]).date())
             self.total[a][w] += 1
             self.by_loc[a].setdefault(e["location"], Counter())[w] += 1
+        # The raw table, same bucketing: only to show what reading past the dedupe view would serve.
+        self.raw_by_loc: Counter = Counter()
+        for e in conn.execute("SELECT account_id, location, occurred_at FROM activity_events"):
+            a = e["account_id"]
+            w = ps.week_start(ps.parse_ts(e["occurred_at"]).astimezone(tzs[a]).date())
+            self.raw_by_loc[(a, e["location"], w)] += 1
 
     def judge(self, series: Counter, weeks: list[date], week: date) -> dict:
         i = weeks.index(week)
         prior = [series.get(w, 0) for w in weeks[:i]]
         n = series.get(week, 0)
         lam = baseline(prior)
-        return {"count": n, "lambda": lam, "verdict": verdict(n, lam),
+        v = verdict(n, lam)
+        return {"count": n, "lambda": lam, "verdict": v, "rank_key": rank_key(n, lam, v),
                 "band": band(lam) if lam is not None and lam >= MIN_LAMBDA else None}
 
     def pulse(self, account: int, week: date | None) -> dict:
@@ -123,9 +137,12 @@ class Seed:
             raise SystemExit(f"{week} is not a complete week for account {account}")
         acct = self.judge(self.total[account], weeks, week)
         if not self.total[account]:
-            acct = {"count": 0, "lambda": None, "verdict": "insufficient_history", "band": None}
+            acct = {"count": 0, "lambda": None, "verdict": "insufficient_history", "band": None,
+                    "rank_key": math.inf}
         locs = {loc: self.judge(c, weeks, week) for loc, c in sorted(self.by_loc[account].items())}
-        return {"account": account, "week": week, "total": acct, "locations": locs}
+        # Ranked order the API must serve: rank key ascending, ties by location label.
+        ranking = sorted(locs, key=lambda loc: (locs[loc]["rank_key"], loc))
+        return {"account": account, "week": week, "total": acct, "locations": locs, "ranking": ranking}
 
 
 def fmt(row: dict) -> str:
@@ -136,8 +153,9 @@ def fmt(row: dict) -> str:
 
 def print_pulse(p: dict) -> None:
     print(f"account {p['account']} week {p['week']}: {fmt(p['total'])}")
-    for loc, row in p["locations"].items():
-        print(f"  {loc:<8} {fmt(row)}")
+    for rank, loc in enumerate(p["ranking"], 1):
+        row = p["locations"][loc]
+        print(f"  #{rank:<2} {loc:<8} {fmt(row)}  rank_key={row['rank_key']:.4g}")
 
 
 def main() -> int:
@@ -185,7 +203,8 @@ def main() -> int:
         above = sum(r["verdict"] == "above" for r in p["locations"].values())
         print(f"account 6 week {w}: {fmt(p['total'])}  ({above}/{len(p['locations'])} locations above)")
     loc_e = seed.by_loc[6]["Site E"][date(2026, 2, 23)]
-    print(f"account 6 Site E week 2026-02-23 (deduped): {loc_e}")
+    raw_e = seed.raw_by_loc[(6, "Site E", date(2026, 2, 23))]
+    print(f"account 6 Site E week 2026-02-23: raw {raw_e} → deduped {loc_e}")
     return 0
 
 
