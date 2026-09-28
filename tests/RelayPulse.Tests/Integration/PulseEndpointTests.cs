@@ -55,8 +55,9 @@ public class PulseEndpointTests(PulseApiFixture api)
     }
 
     // Rule: bucket in the account's own IANA timezone, never UTC. Weekly totals over all 25 complete
-    // weeks; UTC bucketing moves 2 events each for these accounts (acct 1: 02-23/03-02, 06-29/07-06;
-    // acct 9: 06-29 … 07-20), so this fails if bucketing regresses to UTC.
+    // weeks. UTC bucketing moves 2 events per account, each across its own week boundary, so it
+    // changes 4 weekly totals per account by ±1 (acct 1: 02-23/03-02 and 06-29/07-06; acct 9:
+    // 06-29/07-06 and 07-13/07-20). This fails if bucketing regresses to UTC.
     // [OPs] python tools/oracle_poisson.py --account N --series; cross-checked against [PS] §6 min/max/median.
     [Theory]
     [InlineData(1, new[] { 43, 51, 40, 50, 51, 52, 36, 45, 61, 60, 37, 53, 56, 44, 58, 51, 46, 36, 47, 47, 39, 62, 42, 50, 53 })]
