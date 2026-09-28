@@ -1,6 +1,9 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using RelayPulse.Api.Data;
 using RelayPulse.Api.Data.Seeding;
+using RelayPulse.Api.Pulse;
 using RelayPulse.Core;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,7 +16,12 @@ var connectionString = builder.Configuration.GetConnectionString("Relay")
 builder.Services.AddCore();
 builder.Services.AddDbContext<RelayDbContext>(options => options.UseSqlServer(connectionString));
 builder.Services.AddScoped<SeedImporter>();
+builder.Services.AddScoped<PulseQuery>();
 builder.Services.AddProblemDetails();
+
+// Verdicts go over the wire as "not_enough_volume", "insufficient_history", …
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower)));
 
 var app = builder.Build();
 
@@ -28,6 +36,8 @@ if (args is ["seed", .. var rest])
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+
+app.MapPulse();
 
 app.Run();
 

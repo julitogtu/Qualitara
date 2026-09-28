@@ -8,7 +8,10 @@ short version: the rules that must hold in code.
 
 T0–T1 done: skeleton, SQL Server compose, timezone gate green; EF migrations (accounts,
 activity_events, `activity_events_dedup` view, week_buckets), seed import, Core bucket generator.
-DB counts match the goldens. Review-state table deferred to T5. Next is T2 (aggregation + `/pulse`).
+DB counts match the goldens. Review-state table deferred to T5.
+T2 done: Core statistics + `PulseBuilder` (unit-tested, goldens from `tools/oracle_poisson.py`),
+`GET /api/accounts/{id}/pulse` (verified live against the oracle). Next is T3: Testcontainers
+integration tests for `/pulse` — a draft is in `git stash` ("T3: /pulse integration tests").
 
 ## Stack
 
@@ -68,8 +71,11 @@ derive every reporting period from the data. A grep for `UtcNow` outside composi
 clock implementation should return nothing.
 
 **Tests assert golden values produced by `tools/profile_seed.py --dedupe`** — an independent
-implementation, in another language, written before any app code. Do not "fix" a failing test by
-copying what the C# returned; re-derive from the profiler and find out which one is wrong.
+implementation, in another language, written before any app code — and, for the verdict model
+(tails, bands, trimmed baseline, verdicts), by `tools/oracle_poisson.py`, which builds on it with
+deliberately different algorithms from the C#. Do not "fix" a failing test by copying what the C#
+returned; re-derive from the oracles and find out which one is wrong. A golden that neither
+script prints is not a golden.
 
 **Unit tests run with zero infrastructure.** Bucketing, bands, verdicts and window completeness
 must not need Docker. Integration tests use Testcontainers and skip with a clear message when
@@ -109,12 +115,17 @@ These come from profiling the seed. Violating one produces plausible, wrong numb
 
 **Statistics**
 - Weekly counts are Poisson (Fano ≈ 0.93 at both grains). Spread scales as √λ.
-- Use the quasi-Poisson band `λ ± 2.576·√(φλ)`, φ clamped `[1,4]`. **Never a percentage threshold
-  or a fixed z-score** — required sensitivity varies ~10× across locations in one account.
-- 2.576 is calibrated to ~1 false flag per month for a 15-location account, not picked by
-  convention. Changing it changes that rate; see the table in `PLAN.md` §1.
-- Baseline = trailing 12 complete weeks, min 8, **excluding detected anomaly weeks**.
-- Below λ = 3/week report `not enough volume`, do not flag. 49 of 69 locations average <8/week.
+- Verdicts are **exact Poisson tail tests** (`Core/Statistics`), asymmetric: `below` if
+  P(X≤n) < 0.025, `above` if P(X≥n) < 0.005. **Never a percentage threshold or a fixed z-score** —
+  required sensitivity varies ~10× across locations in one account. (Supersedes the symmetric
+  quasi-Poisson `λ ± 2.576·√(φλ)` band in `PLAN.md` §1; no φ term for now.)
+- Band = the integer counts that would be `normal`; it is derived from the same tails, never
+  computed separately.
+- Baseline = trailing 12 complete weeks, min 8 (else `insufficient_history`), **drop one highest
+  and one lowest**, mean of the rest. The trim is what keeps an anomaly out of later baselines.
+- Below λ = 3.7/week report `not enough volume`, do not flag. 3.7 sits just above ln 40 = 3.689,
+  where an empty week first becomes detectable. 49 of 69 locations average <8/week.
+- Rank by `min(p_low/0.025, p_high/0.005)` ascending: < 1 exactly when flagged; unjudged rows get +∞.
 
 **Fields**
 - `outcome` is a **per-type** enum, 7 values, not the 5 in `docs/`: calls →
@@ -129,11 +140,13 @@ These come from profiling the seed. Violating one produces plausible, wrong numb
 - Account 20 has zero events → HTTP 200, populated window, `insufficient_history`. Never 404,
   never divide by zero.
 - Account 6 week `2026-06-01` is a 12× anomaly of undetermined cause. It must be flagged *and*
-  excluded from its own baseline (mean 72.7, not 105.0). Do not "explain" it in code or copy.
+  kept out of the next week's baseline by the trim (2026-06-08: λ 72.3, not the plain 138.0).
+  Do not "explain" it in code or copy.
 
 ## Golden values
 
-From `python tools/profile_seed.py --dedupe`.
+From `python tools/profile_seed.py --dedupe` (counts, window, dedupe, timezone) and
+`python tools/oracle_poisson.py` (λ, bands, verdicts).
 
 | | |
 |---|---|
@@ -141,10 +154,12 @@ From `python tools/profile_seed.py --dedupe`.
 | Buckets per account | 27 total, **25 complete**, last complete `2026-07-20` |
 | Account totals, last complete week | 1=**53**, 6=**87**, 8=**7**, 18=**20**, 19=**13**, 20=**0** |
 | Account 1 per-location, same week | A=9, B=10, C=9, D=9, E=9, F=7 |
-| Account 6 spike week `2026-06-01` | **880**; baseline mean 72.7 excl. / 105.0 incl. |
+| Account 6 spike week `2026-06-01` | **880** vs λ=72.1 → `above`, all 15 locations `above` |
+| Account 6 week after, `2026-06-08` | 102 vs trimmed λ **72.3** (plain mean 138.0) → `above` |
+| Bands (λ → normal counts) | 3→[0,8], 6→[2,13], 25→[16,39], 75→[59,98] |
 | Dedupe at grain | acct 6 / Site E / `2026-02-23`: 3 → **2** |
 | Timezone sensitivity | exactly **8** events change week under UTC bucketing |
-| Verdict calibration | acct 8 (7 vs λ=10.4) → `normal`, not a −36% alarm |
+| Verdict calibration | acct 8 (7 vs λ=10.8) → `normal`, not a −36% alarm |
 
 ## Commands
 
@@ -152,6 +167,8 @@ From `python tools/profile_seed.py --dedupe`.
 python tools/profile_seed.py              # full profile, raw
 python tools/profile_seed.py --dedupe     # what the API should serve
 python tools/profile_seed.py --markdown   # markdown tables
+python tools/oracle_poisson.py              # verdict-model goldens (λ, bands, verdicts)
+python tools/oracle_poisson.py --account 6 --week 2026-06-01   # one account-week, every location
 docker compose up -d                      # SQL Server 2022 on localhost:1433 (see .env.example)
 dotnet run --project src/RelayPulse.Api -- seed   # migrate + load db/seed.sql + build week_buckets (idempotent)
 dotnet tool restore && dotnet ef migrations add <Name> --project src/RelayPulse.Api --output-dir Data/Migrations
