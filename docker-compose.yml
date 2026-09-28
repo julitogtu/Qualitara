@@ -1,3 +1,9 @@
+# `docker compose up --build` runs the whole stack: sqlserver → seed (one-shot) → api → web.
+# Local dev is unchanged: `docker compose up -d sqlserver`, then `dotnet run` + `npm start`.
+x-relay-connection: &relay-connection
+  # DEV ONLY. Same SA password as the sqlserver service; the host is the compose service name.
+  ConnectionStrings__Relay: "Server=sqlserver,1433;Database=${MSSQL_DATABASE:-RelayPulse};User Id=sa;Password=${MSSQL_SA_PASSWORD:-DevOnly_Relay_2026!};Encrypt=True;TrustServerCertificate=True"
+
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -17,6 +23,40 @@ services:
       timeout: 5s
       retries: 20
       start_period: 15s
+
+  # One-shot: the existing `seed` command (migrate + load db/seed.sql + rebuild week_buckets).
+  # Idempotent, so it is safe on every `up`; it exits 0 and the api starts after it.
+  seed:
+    build:
+      context: .
+      dockerfile: src/RelayPulse.Api/Dockerfile
+    image: relay-pulse-api:dev
+    command: ["seed", "/app/db/seed.sql"]
+    environment:
+      <<: *relay-connection
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: relay-pulse-api:dev
+    environment:
+      <<: *relay-connection
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    # Not published to the host: the browser reaches it through web's /api proxy.
+    expose:
+      - "8080"
+
+  web:
+    build:
+      context: ./web
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - api
 
 volumes:
   relay-pulse-sql:

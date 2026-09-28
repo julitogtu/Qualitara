@@ -1,12 +1,31 @@
 # Relay Pulse — DASH-247
 
+## Quick start (Docker)
+
+**Prerequisites:** Docker with Compose v2. Nothing else is needed; the .NET and Node builds run
+inside the images.
+
+```bash
+cp .env.example .env               # optional: every value has a dev-only default
+docker compose up --build          # sqlserver → seed (one-shot) → api → web
+```
+
+Open **<http://localhost:8080/accounts/6/week/2026-06-01>**. The first run takes a few minutes
+to build the images and load the seed. `docker compose down -v` stops everything and deletes the
+database volume.
+
+How the pieces fit together, with diagrams: [`docs/architecture.md`](docs/architecture.md).
+
+---
+
 Relay Pulse answers "is this activity normal for us?" for each account and each location. The
 weekly counts in the seed behave like Poisson arrivals (Fano ≈ 0.93), so most of the week-to-week
 movement is just randomness. I didn't build a chart or a percentage threshold. I built a
 volume-aware significance test: for each location-week it gives a verdict and the range of counts
 that would count as normal, and it says nothing when nothing unusual is happening.
 
-**Start here:** <http://localhost:4200/accounts/6/week/2026-06-01>
+**Start here:** <http://localhost:8080/accounts/6/week/2026-06-01> (Docker) or
+<http://localhost:4200/accounts/6/week/2026-06-01> (local dev)
 
 That week, account 6 logged **880** events against an expected **72.1**, and all **15/15**
 locations are flagged. The app opens on the last complete week (`2026-07-20`) instead, and that
@@ -22,7 +41,7 @@ Python 3.10 (only needed for the oracles in `tools/`).
 
 ```bash
 cp .env.example .env               # optional: dev-only defaults work as-is
-docker compose up -d               # SQL Server 2022 on localhost:1433, with a healthcheck
+docker compose up -d sqlserver     # only SQL Server 2022 on localhost:1433, with a healthcheck
 dotnet run --project src/RelayPulse.Api -- seed   # migrate + load db/seed.sql + build week_buckets (idempotent)
 dotnet run --project src/RelayPulse.Api           # API on http://localhost:5117
 cd web && npm install && npm start                # SPA on http://localhost:4200, /api proxied to :5117
@@ -34,7 +53,9 @@ cd web && npm install && npm start                # SPA on http://localhost:4200
 |---|---|---|
 | `MSSQL_SA_PASSWORD` | `DevOnly_Relay_2026!` | SA password for the container. Public, dev only. |
 | `MSSQL_PORT` | `1433` | Host port mapped to the container's 1433 |
-| `ConnectionStrings__Relay` | set in `appsettings.Development.json` | Override this only if you change the password or port |
+| `MSSQL_DATABASE` | `RelayPulse` | Database the `seed` and `api` containers use |
+| `WEB_PORT` | `8080` | Host port for the `web` container (nginx + `/api` proxy) |
+| `ConnectionStrings__Relay` | set in `appsettings.Development.json` (local); built from the values above in compose | Override this for `dotnet run` only if you change the password or port |
 
 **Tests:** `dotnet test`. The Core tests always run. The integration tests need Docker and skip with
 a message when it isn't available.

@@ -1,0 +1,18 @@
+# Context for src/RelayPulse.Api/Dockerfile (repo root). Only src/, db/seed.sql and the
+# Directory.*.props files are needed.
+**/bin/
+**/obj/
+**/node_modules/
+**/.angular/
+**/dist/
+.git/
+.vs/
+.vscode/
+.idea/
+.env
+TestResults/
+tests/
+web/
+tools/
+ai-log/
+docs/
