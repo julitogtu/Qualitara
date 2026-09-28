@@ -3,7 +3,10 @@ using System.Text.Json;
 using DotNet.Testcontainers.Builders;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RelayPulse.Api.Data;
 using RelayPulse.Api.Data.Seeding;
 using Testcontainers.MsSql;
 
@@ -29,26 +32,40 @@ public sealed class PulseApiFixture : IAsyncLifetime
         var cancellationToken = TestContext.Current.CancellationToken;
         try
         {
-            _container = new MsSqlBuilder().WithImage(Image).Build();
+            _container = new MsSqlBuilder(Image).Build();
             await _container.StartAsync(cancellationToken);
         }
-        catch (Exception ex) when (ex is DockerUnavailableException or TimeoutException or HttpRequestException)
+        catch (DockerUnavailableException ex)
         {
-            SkipReason = $"Integration tests skipped: Docker is not available ({ex.GetType().Name}: {ex.Message}).";
+            // Only "no Docker" is a skip; anything failing past this point is a real failure.
+            SkipReason = $"Integration tests skipped: Docker is not available ({ex.Message}).";
             return;
         }
 
-        var connectionString = _container.GetConnectionString();
+        // The container's default catalog is master; migrate into a database of our own.
+        var connectionString = new SqlConnectionStringBuilder(_container.GetConnectionString())
+        {
+            InitialCatalog = "RelayPulse",
+        }.ConnectionString;
+
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
-            // Not Development: appsettings.Development.json points at localhost:1433, and a missed
-            // override must fail loudly rather than silently test the dev database.
+            // Not Development: appsettings.Development.json points at localhost:1433.
             builder.UseEnvironment("Testing");
             builder.UseSetting("ConnectionStrings:Relay", connectionString);
         });
 
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
+            // Guard: if the override ever stops reaching Program, the tests would silently run
+            // against the developer's compose database instead of this container.
+            var db = scope.ServiceProvider.GetRequiredService<RelayDbContext>();
+            var actual = new SqlConnectionStringBuilder(db.Database.GetConnectionString());
+            if (actual.DataSource != new SqlConnectionStringBuilder(connectionString).DataSource)
+            {
+                throw new InvalidOperationException($"API is not using the test container (got {actual.DataSource}).");
+            }
+
             var importer = scope.ServiceProvider.GetRequiredService<SeedImporter>();
             await importer.RunAsync(SeedPath.Resolve(null), cancellationToken);
         }

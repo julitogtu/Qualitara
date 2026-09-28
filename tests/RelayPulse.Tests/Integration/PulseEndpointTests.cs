@@ -144,14 +144,16 @@ public class PulseEndpointTests(PulseApiFixture api)
         Assert.Equal(keys.Order(), keys);
     }
 
-    // [OPw] --account 15 (default week): "#1 Site ?  #2 Site B"
+    // Unflagged rows still rank by closeness to a flag: Site B (2 vs λ 6.8, key 1.378) leads Site C
+    // (12 vs λ 5.3, key 1.682) although neither is flagged.
+    // [OPw] --account 15: "#1 Site B … #2 Site C … #3 Site A"
     [Fact]
-    public async Task Ranking_Account15DefaultWeek_SiteBRanksSecond()
+    public async Task Ranking_Account15DefaultWeek_OrderMatchesOracle()
     {
         var pulse = await api.GetOkPulseAsync(15, null, Ct);
 
         var order = pulse.GetProperty("locations").EnumerateArray().Select(r => r.GetProperty("location").GetString()).ToList();
-        Assert.Equal(1, order.IndexOf("Site B"));
+        Assert.Equal(["Site B", "Site C", "Site A"], order);
     }
 
     // Rule: an empty account is 200 with a populated window and insufficient_history — never 404.
@@ -194,11 +196,11 @@ public class PulseEndpointTests(PulseApiFixture api)
     }
 
     // Rule: verdicts go over the wire as snake_case strings; a volume-gated row has no band.
-    // Account 1's locations average < 3.7/week ([OPw] --account 1), so its default week has gated rows.
+    // [OPw] --account 6 --week 2026-04-13: "Site F n=6 λ=3.625 band=- not_enough_volume", plus above/below/normal rows.
     [Fact]
     public async Task Contract_Verdicts_SerializeAsSnakeCaseStrings_BandNullWhenNotEnoughVolume()
     {
-        var pulse = await api.GetOkPulseAsync(1, null, Ct);
+        var pulse = await api.GetOkPulseAsync(6, "2026-04-13", Ct);
 
         var rows = pulse.GetProperty("locations").EnumerateArray().Append(pulse.GetProperty("account")).ToList();
         Assert.All(rows, r =>
